@@ -42,3 +42,8 @@ void get_addr_name(char *namebuf, size_t buflen, struct sockaddr_in const *sin) 
     snprintf(namebuf, buflen, "%s", h->h_name);
   }
 }
+
+void gensym(char *buf, size_t buflen, char const *prefix) {
+  static int counter = 0;
+  snprintf(buf, buflen, "%s%d", prefix, counter++);
+}

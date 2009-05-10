@@ -25,6 +25,8 @@
 
 #include "util.h"
 #include "connection.h"
+#include "queue.h"
+#include "exchange.h"
 
 struct rais_configuration_t_ {
   short listen_port;
@@ -108,7 +110,15 @@ static void setup_server_socket(void) {
 int main(int argc, char * const argv[]) {
   event_init();
   parse_options(argc, argv);
+
   setup_server_socket();
+
+  init_exchange();
+  init_queue();
+
   event_dispatch();
+
+  done_queue();
+  done_exchange();
   return 0;
 }

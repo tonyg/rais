@@ -26,39 +26,7 @@
 #include "config.h"
 #include "util.h"
 #include "connection.h"
-
-#define PROTOCOL_HEADER_TIMEOUT 2
-#define MAX_CHANNELS 16
-#define SUGGESTED_FRAME_MAX 65536
-
-typedef enum connection_state_enum_ {
-  CONNECTION_STATE_INITIAL,
-  CONNECTION_STATE_HEADER_RECEIVED,
-  CONNECTION_STATE_READY,
-  CONNECTION_STATE_DEAD
-} connection_state_enum;
-
-struct connstate_t_; /* forward */
-
-typedef struct chanstate_t_ {
-} chanstate_t;
-
-typedef void (*channel_callback_t)(struct connstate_t_ *conn,
-				   amqp_frame_t *frame,
-				   chanstate_t *chan);
-
-typedef struct connstate_t_ {
-  struct sockaddr_in peername;
-  int fd;
-  amqp_connection_state_t amqp_conn;
-  struct bufferevent *io;
-
-  connection_state_enum state;
-  channel_callback_t channel_callback[MAX_CHANNELS + 1];
-  chanstate_t *channel_state[MAX_CHANNELS + 1];
-
-  amqp_bytes_t vhost;
-} connstate_t;
+#include "channel.h"
 
 static char const *connection_name(connstate_t *conn) {
   char name[256];
@@ -79,15 +47,6 @@ static void destroy_connection(connstate_t *conn) {
   free(conn);
 }
 
-static chanstate_t *new_channel_state(void) {
-  chanstate_t *chan = calloc(1, sizeof(chanstate_t));
-  return chan;
-}
-
-static void destroy_channel_state(chanstate_t *chan) {
-  free(chan);
-}
-
 void send_method(connstate_t *conn,
 		 amqp_channel_t channel,
 		 amqp_method_number_t id,
@@ -105,17 +64,7 @@ void send_method(connstate_t *conn,
 		     conn->io);
 }
 
-#define SEND_METHOD(conn, ch, id, structname, ...)			\
-  ({									\
-    structname _decoded_method___ = (structname) { __VA_ARGS__ };	\
-    send_method(conn, ch, id, &_decoded_method___);			\
-  })
-
-static void close_connection(connstate_t *conn,
-			     short code,
-			     char const *explanation,
-			     ...)
-{
+void close_connection(connstate_t *conn, short code, char const *explanation, ...) {
   char buf[4096];
   va_list vl;
   char *preamble;
@@ -179,11 +128,11 @@ static void channel_closewait(connstate_t *conn, amqp_frame_t *frame, chanstate_
   set_channel_callback(conn, frame->channel, &handle_channel_when_closed);
 }
 
-static void close_channel(connstate_t *conn,
-			  amqp_channel_t ch,
-			  short code,
-			  char const *explanation,
-			  ...)
+void close_channel(connstate_t *conn,
+		   amqp_channel_t ch,
+		   short code,
+		   char const *explanation,
+		   ...)
 {
   char buf[4096];
   va_list vl;
@@ -211,24 +160,14 @@ static void close_channel(connstate_t *conn,
     set_channel_callback(conn, ch, &channel_closewait);
     SEND_METHOD(conn, ch, AMQP_CHANNEL_CLOSE_METHOD, amqp_channel_close_t,
 		code, amqp_cstring_bytes(buf), 0, 0);
-  } else {
-    destroy_connection(conn);
   }
 }
 
-static void close_connection_command_invalid(connstate_t *conn, amqp_frame_t *frame)
-{
+void close_connection_command_invalid(connstate_t *conn, amqp_frame_t *frame) {
   close_connection(conn, AMQP_COMMAND_INVALID, "Unexpected frame %d/%08X",
 		   frame->frame_type,
 		   frame->payload.method.id);
 }
-
-#define ENSURE_FRAME_IS_METHOD(conn, receivedframe)		\
-  if ((receivedframe)->frame_type != AMQP_FRAME_METHOD) {	\
-    close_connection_command_invalid(conn, (receivedframe));	\
-    return;							\
-  } else {							\
-  }
 
 #define CHECK_INBOUND_METHOD(conn, expectedid, receivedframe)	\
   ({								\
@@ -259,25 +198,12 @@ static void handle_connection_misc(connstate_t *conn, amqp_frame_t *frame, chans
   }
 }
 
-static void handle_channel_normal(connstate_t *conn,
-				  amqp_frame_t *frame,
-				  chanstate_t *chan)
-{
-  ENSURE_FRAME_IS_METHOD(conn, frame);
-  switch (frame->payload.method.id) {
-    default:
-      close_channel(conn, frame->channel, AMQP_NOT_IMPLEMENTED, "Method %s not implemented",
-		    amqp_method_name(frame->payload.method.id));
-      break;
-  }
-}
-
 static void handle_channel_when_closed(connstate_t *conn, amqp_frame_t *frame, chanstate_t *chan)
 {
   ENSURE_FRAME_IS_METHOD(conn, frame);
   switch (frame->payload.method.id) {
     case AMQP_CHANNEL_OPEN_METHOD:
-      conn->channel_state[frame->channel] = new_channel_state();
+      conn->channel_state[frame->channel] = new_channel_state(frame->channel);
       set_channel_callback(conn, frame->channel, &handle_channel_normal);
       SEND_METHOD(conn, frame->channel, AMQP_CHANNEL_OPEN_OK_METHOD, amqp_channel_open_ok_t);
       break;
