@@ -242,7 +242,7 @@ static void handle_tune_ok(connstate_t *conn, amqp_frame_t *frame, chanstate_t *
   amqp_connection_tune_ok_t *m = CHECK_INBOUND_METHOD(conn,
 						      AMQP_CONNECTION_TUNE_OK_METHOD,
 						      frame);
-  amqp_tune_connection(conn->amqp_conn, m->frame_max);
+  amqp_tune_connection(conn->amqp_conn, m->channel_max, m->frame_max);
   set_channel_callback(conn, 0, &handle_connection_open);
 }
 
