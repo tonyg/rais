@@ -7,8 +7,10 @@ rais_SOURCES = \
 	buffer.c util.c connection.c channel.c \
         buffer.h util.h connection.h channel.h \
 	\
-	exchange.c queue.c hashtable.c main.c \
-	exchange.h queue.h hashtable.h rais.h \
+	vhost.c exchange.c queue.c hashtable.c main.c \
+	vhost.h exchange.h queue.h hashtable.h \
+	\
+	exchange_direct.c exchange_fanout.c exchange_topic.c \
 	\
 	syncpipe.c \
 	syncpipe.h

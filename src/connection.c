@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "util.h"
+#include "hashtable.h"
+#include "vhost.h"
 #include "connection.h"
 #include "channel.h"
 
@@ -39,7 +41,6 @@ static char const *connection_name(connstate_t *conn) {
 static void destroy_connection(connstate_t *conn) {
   info("Shutting down connection from %s on fd %d", connection_name(conn), conn->fd);
 
-  AMQP_BYTES_FREE(conn->vhost);
   bufferevent_disable(conn->io, EV_READ | EV_WRITE);
   bufferevent_free(conn->io);
   amqp_destroy_connection(conn->amqp_conn);
@@ -199,7 +200,7 @@ static void handle_connection_misc(connstate_t *conn, amqp_frame_t *frame, chans
       conn->state = CONNECTION_STATE_DEAD;
       close_connection(conn,
 		       m->reply_code,
-		       "Connection close received from peer with code %s (%d): %*s",
+		       "Connection close received from peer with code %s (%d): %.*s",
 		       amqp_constant_name(m->reply_code),
 		       m->reply_code,
 		       m->reply_text.len,
@@ -243,7 +244,12 @@ static void handle_connection_open(connstate_t *conn, amqp_frame_t *frame, chans
 
   info("Opening vhost %.*s",
        (int) m->virtual_host.len, (char *) m->virtual_host.bytes);
-  conn->vhost = amqp_bytes_malloc_dup(m->virtual_host);
+  conn->vhost = lookup_vhost(m->virtual_host);
+  if (conn->vhost == NULL) {
+    close_connection(conn, AMQP_INVALID_PATH, "Unknown vhost %.*s",
+		     m->virtual_host.len, m->virtual_host.bytes);
+    return;
+  }
 
   conn->state = CONNECTION_STATE_READY;
   set_channel_callback(conn, 0, &handle_connection_misc);
@@ -435,7 +441,7 @@ void start_inbound_connection(struct sockaddr_in const *peername, int fd) {
   bufferevent_settimeout(conn->io, PROTOCOL_HEADER_TIMEOUT, 0);
   bufferevent_enable(conn->io, EV_READ | EV_WRITE);
   conn->state = CONNECTION_STATE_INITIAL;
-  conn->vhost = AMQP_EMPTY_BYTES;
+  conn->vhost = NULL;
 
   info("Accepted connection from %s on fd %d", connection_name(conn));
 }

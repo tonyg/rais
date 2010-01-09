@@ -11,7 +11,7 @@ struct exchange_type_t_ {
 };
 
 struct exchange_t_ {
-  resource_name_t name;
+  amqp_bytes_t name;
   exchange_type_t *type;
   void *type_data;
   amqp_boolean_t durable;
@@ -26,13 +26,15 @@ extern void register_exchange_type(exchange_type_t *type);
 extern exchange_type_t *lookup_exchange_type(amqp_bytes_t name);
 
 extern exchange_t *declare_exchange(int *status, /* out */
-				    resource_name_t const *name,
+				    vhost_t *vhost,
+				    amqp_bytes_t name,
 				    exchange_type_t *type,
 				    amqp_boolean_t durable,
 				    amqp_boolean_t auto_delete,
 				    amqp_table_t arguments);
 extern exchange_t *lookup_exchange(int *status, /* out */
-				   resource_name_t const *name);
+				   vhost_t *vhost,
+				   amqp_bytes_t name);
 extern void delete_exchange(int *status, /* out */
 			    exchange_t *x);
 

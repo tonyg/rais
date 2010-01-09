@@ -25,9 +25,10 @@
 
 #include "config.h"
 #include "util.h"
+#include "hashtable.h"
+#include "vhost.h"
 #include "connection.h"
 #include "channel.h"
-#include "rais.h"
 #include "exchange.h"
 #include "queue.h"
 
@@ -50,7 +51,6 @@ void handle_channel_normal(connstate_t *conn,
   switch (frame->payload.method.id) {
     case AMQP_EXCHANGE_DECLARE_METHOD: {
       amqp_exchange_declare_t *m = (amqp_exchange_declare_t *) frame->payload.method.decoded;
-      resource_name_t name;
       exchange_type_t *type;
       exchange_t *x;
 
@@ -60,15 +60,12 @@ void handle_channel_normal(connstate_t *conn,
 	break;
       }
 
-      name.vhost = conn->vhost;
-      name.name = m->exchange;
-
       x = m->passive
-	? lookup_exchange(&chan->status, &name)
-	: declare_exchange(&chan->status, &name, type, m->durable, m->auto_delete, m->arguments);
-
+	? lookup_exchange(&chan->status, conn->vhost, m->exchange)
+	: declare_exchange(&chan->status, conn->vhost, m->exchange,
+			   type, m->durable, m->auto_delete, m->arguments);
       if (!chan->status) {
-	SEND_METHOD(conn, frame->channel,
+	SEND_METHOD(conn, chan->channel,
 		    AMQP_EXCHANGE_DECLARE_OK_METHOD, amqp_exchange_declare_ok_t);
       }
       break;
@@ -76,24 +73,21 @@ void handle_channel_normal(connstate_t *conn,
 
     case AMQP_QUEUE_DECLARE_METHOD: {
       amqp_queue_declare_t *m = (amqp_queue_declare_t *) frame->payload.method.decoded;
-      resource_name_t name;
       queue_t *q;
 
-      name.vhost = conn->vhost;
-      name.name = m->queue;
       q = m->passive
-	? lookup_queue(&chan->status, &name)
-	: declare_queue(&chan->status, &name, m->durable, m->auto_delete, m->arguments);
+	? lookup_queue(&chan->status, conn->vhost, m->queue)
+	: declare_queue(&chan->status, conn->vhost, m->queue,
+			m->durable, m->auto_delete, m->arguments);
       if (!chan->status) {
-	SEND_METHOD(conn, frame->channel, AMQP_QUEUE_DECLARE_OK_METHOD, amqp_queue_declare_ok_t,
-		    q->name.name, q->queue_len, q->consumer_count);
+	SEND_METHOD(conn, chan->channel, AMQP_QUEUE_DECLARE_OK_METHOD, amqp_queue_declare_ok_t,
+		    q->name, q->queue_len, q->consumer_count);
       }
       break;
     }
 
     case AMQP_BASIC_PUBLISH_METHOD: {
       amqp_basic_publish_t *m = (amqp_basic_publish_t *) frame->payload.method.decoded;
-      resource_name_t name;
       exchange_t *x;
 
       if (m->mandatory || m->immediate) {
@@ -101,9 +95,7 @@ void handle_channel_normal(connstate_t *conn,
 	break;
       }
 
-      name.vhost = conn->vhost;
-      name.name = m->exchange;
-      x = lookup_exchange(&chan->status, &name);
+      x = lookup_exchange(&chan->status, conn->vhost, m->exchange);
       if (chan->status) break;
 
       chan->status = AMQP_INTERNAL_ERROR; /* HERE */
@@ -122,7 +114,7 @@ void handle_channel_normal(connstate_t *conn,
 		       chan->status,
 		       amqp_method_name(frame->payload.method.id));
     } else {
-      close_channel(conn, frame->channel, chan->status, "Channel error %s (%d) in response to %s",
+      close_channel(conn, chan->channel, chan->status, "Channel error %s (%d) in response to %s",
 		    amqp_constant_name(chan->status),
 		    chan->status,
 		    amqp_method_name(frame->payload.method.id));

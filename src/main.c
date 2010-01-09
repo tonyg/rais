@@ -24,8 +24,9 @@
 #include <event.h>
 
 #include "util.h"
+#include "hashtable.h"
+#include "vhost.h"
 #include "connection.h"
-#include "rais.h"
 #include "queue.h"
 #include "exchange.h"
 
@@ -112,14 +113,18 @@ int main(int argc, char * const argv[]) {
   event_init();
   parse_options(argc, argv);
 
-  setup_server_socket();
-
+  init_vhost();
   init_exchange();
   init_queue();
+
+  declare_vhost(amqp_cstring_bytes("/"));
+
+  setup_server_socket();
 
   event_dispatch();
 
   done_queue();
   done_exchange();
+  done_vhost();
   return 0;
 }

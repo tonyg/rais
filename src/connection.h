@@ -30,7 +30,7 @@ typedef struct connstate_t_ {
   channel_callback_t channel_callback[MAX_CHANNELS + 1];
   struct chanstate_t_ *channel_state[MAX_CHANNELS + 1];
 
-  amqp_bytes_t vhost;
+  vhost_t *vhost;
 } connstate_t;
 
 extern void start_inbound_connection(struct sockaddr_in const *peeraddr, int fd);
