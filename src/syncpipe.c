@@ -10,14 +10,15 @@
 
 #include "syncpipe.h"
 
-syncpipe_t *open_syncpipe(void) {
+void open_syncpipe(syncpipe_out_t *po, syncpipe_in_t *pi) {
   syncpipe_t *p = malloc(sizeof(syncpipe_t));
   p->first_out = NULL;
   p->last_out = NULL;
   p->first_in = NULL;
   p->last_in = NULL;
   p->is_closed = 0;
-  return p;
+  po->p = p;
+  pi->p = p;
 }
 
 static void run_syncpipe(syncpipe_t *p) {
@@ -55,11 +56,12 @@ static void run_syncpipe(syncpipe_t *p) {
   }
 }
 
-void syncpipe_write(syncpipe_t *p,
+void syncpipe_write(syncpipe_out_t po,
 		    amqp_bytes_t data,
 		    void *context,
 		    syncpipe_callback_t callback)
 {
+  syncpipe_t *p = po.p;
   syncpipe_out_chunk_t *w = malloc(sizeof(syncpipe_out_chunk_t));
   w->next = NULL;
   w->data = data;
@@ -75,11 +77,12 @@ void syncpipe_write(syncpipe_t *p,
   run_syncpipe(p);
 }
 
-void syncpipe_read(syncpipe_t *p,
+void syncpipe_read(syncpipe_in_t pi,
 		   size_t length,
 		   void *context,
 		   syncpipe_callback_t callback)
 {
+  syncpipe_t *p = pi.p;
   syncpipe_reader_t *r = malloc(sizeof(syncpipe_reader_t));
   r->next = NULL;
   r->remaining = length;
@@ -94,7 +97,11 @@ void syncpipe_read(syncpipe_t *p,
   run_syncpipe(p);
 }
 
-void syncpipe_close(syncpipe_t *p) {
+static void syncpipe_close(syncpipe_t *p) {
+  if (p == NULL) {
+    return;
+  }
+
   p->is_closed = 1;
 
   {
@@ -120,4 +127,12 @@ void syncpipe_close(syncpipe_t *p) {
   }
 
   free(p);
+}
+
+void syncpipe_close_out(syncpipe_out_t po) {
+  syncpipe_close(po.p);
+}
+
+void syncpipe_close_in(syncpipe_in_t pi) {
+  syncpipe_close(pi.p);
 }

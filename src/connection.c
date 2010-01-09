@@ -26,6 +26,7 @@
 #include "config.h"
 #include "util.h"
 #include "hashtable.h"
+#include "syncpipe.h"
 #include "vhost.h"
 #include "connection.h"
 #include "channel.h"
@@ -358,6 +359,11 @@ static void handle_frame(connstate_t *conn, amqp_frame_t *frame) {
 	(conn->channel_callback[frame->channel])(conn,
 						 frame,
 						 conn->channel_state[frame->channel]);
+	if ((frame->frame_type == AMQP_FRAME_METHOD) &&
+	    amqp_method_has_content(frame->payload.method.id))
+	  {
+	    set_channel_callback(conn, frame->channel, &handle_channel_props);
+	  }
       }
       return;
 
@@ -443,5 +449,5 @@ void start_inbound_connection(struct sockaddr_in const *peername, int fd) {
   conn->state = CONNECTION_STATE_INITIAL;
   conn->vhost = NULL;
 
-  info("Accepted connection from %s on fd %d", connection_name(conn));
+  info("Accepted connection from %s on fd %d", connection_name(conn), conn->fd);
 }

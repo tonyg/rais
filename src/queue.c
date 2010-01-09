@@ -14,8 +14,10 @@
 #include "config.h"
 #include "util.h"
 #include "hashtable.h"
+#include "syncpipe.h"
 #include "vhost.h"
 #include "queue.h"
+#include "exchange.h"
 
 void init_queue(void) {
 }
@@ -27,6 +29,22 @@ static queue_t *internal_lookup_queue(vhost_t *vhost, amqp_bytes_t name) {
   queue_t *result = NULL;
   hashtable_get(&vhost->queues, name, (void **) &result);
   return result;
+}
+
+static void bind_to_default_exchange(vhost_t *vhost, queue_t *q) {
+  int status = 0;
+  exchange_t *x = lookup_exchange(&status, vhost, AMQP_EMPTY_BYTES);
+  if (status) {
+    /* Missing default exchange. Continue. */
+    warn("Default exchange not found (%d); continuing without binding queue \"%.*s\"",
+	 status, q->name.len, q->name.bytes);
+    return;
+  }
+  exchange_bind(&status, x, q, q->name, AMQP_EMPTY_TABLE);
+  if (status) {
+    warn("Default exchange binding failed %s(%d)",
+	 amqp_constant_name(status), status);
+  }
 }
 
 queue_t *declare_queue(int *status,
@@ -54,6 +72,7 @@ queue_t *declare_queue(int *status,
     q->consumer_count = 0;
     info("Queue \"%.*s\" created", name.len, name.bytes);
     hashtable_put(&vhost->queues, name, q);
+    bind_to_default_exchange(vhost, q);
   }
 
   return q;

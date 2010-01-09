@@ -14,7 +14,9 @@
 #include "config.h"
 #include "util.h"
 #include "hashtable.h"
+#include "syncpipe.h"
 #include "vhost.h"
+#include "queue.h"
 #include "exchange.h"
 
 static hashtable_t all_vhosts;
@@ -29,7 +31,7 @@ void done_vhost(void) {
 
 static void create_standard_resources(vhost_t *vhost) {
   int status = 0;
-  declare_exchange(&status, vhost, amqp_cstring_bytes(""),
+  declare_exchange(&status, vhost, AMQP_EMPTY_BYTES,
 		   lookup_exchange_type(amqp_cstring_bytes("direct")),
 		   1, 0, AMQP_EMPTY_TABLE);
   if (status) die("Could not create default exchange: %d", status);

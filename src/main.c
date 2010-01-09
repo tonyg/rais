@@ -25,6 +25,7 @@
 
 #include "util.h"
 #include "hashtable.h"
+#include "syncpipe.h"
 #include "vhost.h"
 #include "connection.h"
 #include "queue.h"

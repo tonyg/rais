@@ -14,7 +14,9 @@
 #include "config.h"
 #include "util.h"
 #include "hashtable.h"
+#include "syncpipe.h"
 #include "vhost.h"
+#include "queue.h"
 #include "exchange.h"
 
 static hashtable_t all_exchange_types;
@@ -68,6 +70,8 @@ exchange_t *declare_exchange(int *status,
     x->durable = durable;
     x->auto_delete = auto_delete;
     x->arguments = AMQP_EMPTY_TABLE; /* TODO: copy arguments */
+    init_hashtable(&x->fanout, 127, NULL, NULL);
+    init_hashtable(&x->direct, 127, NULL, NULL);
     type->init(x);
     info("Exchange \"%.*s\" of type %.*s created",
 	 name.len, name.bytes,
@@ -89,4 +93,32 @@ exchange_t *lookup_exchange(int *status,
   }
 
   return x;
+}
+
+void exchange_bind(int *status,
+		   exchange_t *x,
+		   queue_t *q,
+		   amqp_bytes_t routing_key,
+		   amqp_table_t arguments)
+{
+  x->type->bind(status, x, q, routing_key, arguments);
+}
+
+void exchange_unbind(int *status,
+		     exchange_t *x,
+		     queue_t *q,
+		     amqp_bytes_t routing_key,
+		     amqp_table_t arguments)
+{
+  x->type->unbind(status, x, q, routing_key, arguments);
+}
+
+syncpipe_out_t exchange_route(int *status,
+			      exchange_t *x,
+			      amqp_bytes_t routing_key,
+			      amqp_basic_properties_t *props,
+			      uint64_t body_size,
+			      amqp_bytes_t raw_props)
+{
+  die("here");
 }
