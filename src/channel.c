@@ -28,6 +28,7 @@
 #include "connection.h"
 #include "channel.h"
 #include "rais.h"
+#include "exchange.h"
 #include "queue.h"
 
 chanstate_t *new_channel_state(amqp_channel_t channel) {
@@ -47,6 +48,32 @@ void handle_channel_normal(connstate_t *conn,
   ENSURE_FRAME_IS_METHOD(conn, frame);
 
   switch (frame->payload.method.id) {
+    case AMQP_EXCHANGE_DECLARE_METHOD: {
+      amqp_exchange_declare_t *m = (amqp_exchange_declare_t *) frame->payload.method.decoded;
+      resource_name_t name;
+      exchange_type_t *type;
+      exchange_t *x;
+
+      type = lookup_exchange_type(m->type);
+      if (type == NULL) {
+	chan->status = AMQP_COMMAND_INVALID;
+	break;
+      }
+
+      name.vhost = conn->vhost;
+      name.name = m->exchange;
+
+      x = m->passive
+	? lookup_exchange(&chan->status, &name)
+	: declare_exchange(&chan->status, &name, type, m->durable, m->auto_delete, m->arguments);
+
+      if (!chan->status) {
+	SEND_METHOD(conn, frame->channel,
+		    AMQP_EXCHANGE_DECLARE_OK_METHOD, amqp_exchange_declare_ok_t);
+      }
+      break;
+    }
+
     case AMQP_QUEUE_DECLARE_METHOD: {
       amqp_queue_declare_t *m = (amqp_queue_declare_t *) frame->payload.method.decoded;
       resource_name_t name;
@@ -66,6 +93,14 @@ void handle_channel_normal(connstate_t *conn,
 
     case AMQP_BASIC_PUBLISH_METHOD: {
       amqp_basic_publish_t *m = (amqp_basic_publish_t *) frame->payload.method.decoded;
+      resource_name_t name;
+      exchange_t *x;
+
+      name.vhost = conn->vhost;
+      name.name = m->exchange;
+      x = lookup_exchange(&chan->status, &name);
+      if (chan->status) break;
+
       chan->status = AMQP_INTERNAL_ERROR; /* HERE */
       break;
     }

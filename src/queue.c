@@ -29,9 +29,7 @@ void done_queue(void) {
 
 static queue_t *internal_lookup_queue(amqp_bytes_t flat_name) {
   queue_t *result = NULL;
-  if (!hashtable_get(&all_queues, flat_name, (void **) &result)) {
-    result = NULL;
-  }
+  hashtable_get(&all_queues, flat_name, (void **) &result);
   return result;
 }
 
@@ -59,6 +57,7 @@ queue_t *declare_queue(int *status,
     q->arguments = AMQP_EMPTY_TABLE; /* TODO: copy arguments */
     q->queue_len = 0;
     q->consumer_count = 0;
+    info("Queue %*s created", flat_name.len, flat_name.bytes);
     hashtable_put(&all_queues, flat_name, q);
   }
 

@@ -56,7 +56,7 @@ amqp_bytes_t flatten_name(resource_name_t const *name) {
   amqp_bytes_t result = amqp_bytes_malloc(name->vhost.len + 1 + name->name.len);
   char *p = result.bytes;
   memcpy(p, name->vhost.bytes, name->vhost.len);
-  p[name->vhost.len] = '\0';
+  p[name->vhost.len] = ':';
   memcpy(&p[name->vhost.len + 1], name->name.bytes, name->name.len);
   return result;
 }
