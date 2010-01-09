@@ -6,6 +6,10 @@
 
 #include <netdb.h>
 
+#include <amqp.h>
+
+#include "rais.h"
+
 void die(char const *format, ...) {
   va_list vl;
   va_start(vl, format);
@@ -46,4 +50,13 @@ void get_addr_name(char *namebuf, size_t buflen, struct sockaddr_in const *sin) 
 void gensym(char *buf, size_t buflen, char const *prefix) {
   static int counter = 0;
   snprintf(buf, buflen, "%s%d", prefix, counter++);
+}
+
+amqp_bytes_t flatten_name(resource_name_t const *name) {
+  amqp_bytes_t result = amqp_bytes_malloc(name->vhost.len + 1 + name->name.len);
+  char *p = result.bytes;
+  memcpy(p, name->vhost.bytes, name->vhost.len);
+  p[name->vhost.len] = '\0';
+  memcpy(&p[name->vhost.len + 1], name->name.bytes, name->name.len);
+  return result;
 }

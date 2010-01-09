@@ -26,6 +26,7 @@ AC_CHECK_LIB(event,event_init,,[AC_MSG_ERROR([cannot link with libevent])])
 dnl Header-file checks
 AC_HEADER_STDC
 AC_CHECK_HEADERS([event.h],,[AC_MSG_ERROR([cannot find event.h to include])])
+AC_CHECK_HEADERS([tcadb.h],,[AC_MSG_ERROR([cannot find tokyocabinet's tcadb.h to include])])
 
 dnl Only use -Wall if we have gcc
 if test "x$GCC" = "xyes"; then
@@ -33,6 +34,12 @@ if test "x$GCC" = "xyes"; then
     CFLAGS="$CFLAGS -Wall"
   fi
 fi
+
+dnl Enable -m64 if we were asked to do so
+AC_ARG_ENABLE(64-bit,
+[  --enable-64-bit         produce 64-bit library],
+[CFLAGS="$CFLAGS -m64"; LDFLAGS="$LDFLAGS -m64"],
+)
 
 AC_OUTPUT(
 Makefile

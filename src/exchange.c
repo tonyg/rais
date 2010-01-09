@@ -13,6 +13,7 @@
 
 #include "config.h"
 #include "util.h"
+#include "rais.h"
 #include "exchange.h"
 
 void init_exchange(void) {

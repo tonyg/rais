@@ -27,6 +27,8 @@
 #include "util.h"
 #include "connection.h"
 #include "channel.h"
+#include "rais.h"
+#include "queue.h"
 
 chanstate_t *new_channel_state(amqp_channel_t channel) {
   chanstate_t *chan = calloc(1, sizeof(chanstate_t));
@@ -43,19 +45,47 @@ void handle_channel_normal(connstate_t *conn,
 			   chanstate_t *chan)
 {
   ENSURE_FRAME_IS_METHOD(conn, frame);
+
   switch (frame->payload.method.id) {
-    /*
     case AMQP_QUEUE_DECLARE_METHOD: {
       amqp_queue_declare_t *m = (amqp_queue_declare_t *) frame->payload.method.decoded;
-      SEND_METHOD(conn, frame->channel, AMQP_QUEUE_DECLARE_OK_METHOD, amqp_queue_declare_ok_t,
-		  m->queue, 0, 0);
+      resource_name_t name;
+      queue_t *q;
+
+      name.vhost = conn->vhost;
+      name.name = m->queue;
+      q = m->passive
+	? lookup_queue(&chan->status, &name)
+	: declare_queue(&chan->status, &name, m->durable, m->auto_delete, m->arguments);
+      if (!chan->status) {
+	SEND_METHOD(conn, frame->channel, AMQP_QUEUE_DECLARE_OK_METHOD, amqp_queue_declare_ok_t,
+		    q->name.name, q->queue_len, q->consumer_count);
+      }
       break;
     }
-    */
+
+    case AMQP_BASIC_PUBLISH_METHOD: {
+      amqp_basic_publish_t *m = (amqp_basic_publish_t *) frame->payload.method.decoded;
+      chan->status = AMQP_INTERNAL_ERROR; /* HERE */
+      break;
+    }
 
     default:
-      close_channel(conn, frame->channel, AMQP_NOT_IMPLEMENTED, "Method %s not implemented",
-		    amqp_method_name(frame->payload.method.id));
+      chan->status = AMQP_NOT_IMPLEMENTED;
       break;
+  }
+
+  if (chan->status) {
+    if (amqp_constant_is_hard_error(chan->status)) {
+      close_connection(conn, chan->status, "Connection error %s (%d) in response to %s",
+		       amqp_constant_name(chan->status),
+		       chan->status,
+		       amqp_method_name(frame->payload.method.id));
+    } else {
+      close_channel(conn, frame->channel, chan->status, "Channel error %s (%d) in response to %s",
+		    amqp_constant_name(chan->status),
+		    chan->status,
+		    amqp_method_name(frame->payload.method.id));
+    }
   }
 }

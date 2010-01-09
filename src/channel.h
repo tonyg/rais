@@ -3,6 +3,7 @@
 
 typedef struct chanstate_t_ {
   amqp_channel_t channel;
+  int status; /* zero for OK, nonzero is an AMQP error code */
 } chanstate_t;
 
 extern chanstate_t *new_channel_state(amqp_channel_t channel);

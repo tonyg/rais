@@ -25,6 +25,7 @@
 
 #include "util.h"
 #include "connection.h"
+#include "rais.h"
 #include "queue.h"
 #include "exchange.h"
 

@@ -95,6 +95,7 @@ void close_connection(connstate_t *conn, short code, char const *explanation, ..
   }
 
   if (conn->state == CONNECTION_STATE_READY) {
+    conn->state = CONNECTION_STATE_CLOSE_OK_WAIT;
     SEND_METHOD(conn, 0, AMQP_CONNECTION_CLOSE_METHOD, amqp_connection_close_t,
 		code, amqp_cstring_bytes(buf), 0, 0);
   } else {
@@ -164,9 +165,17 @@ void close_channel(connstate_t *conn,
 }
 
 void close_connection_command_invalid(connstate_t *conn, amqp_frame_t *frame) {
-  close_connection(conn, AMQP_COMMAND_INVALID, "Unexpected frame %d/%08X",
-		   frame->frame_type,
-		   frame->payload.method.id);
+  if (conn->state == CONNECTION_STATE_CLOSE_OK_WAIT) {
+    /*
+    info("Ignoring frame %d/%08X",
+	 frame->frame_type,
+	 frame->payload.method.id);
+    */
+  } else {
+    close_connection(conn, AMQP_COMMAND_INVALID, "Unexpected frame %d/%08X",
+		     frame->frame_type,
+		     frame->payload.method.id);
+  }
 }
 
 #define CHECK_INBOUND_METHOD(conn, expectedid, receivedframe)	\
@@ -183,9 +192,20 @@ static void handle_connection_misc(connstate_t *conn, amqp_frame_t *frame, chans
 {
   ENSURE_FRAME_IS_METHOD(conn, frame);
   switch (frame->payload.method.id) {
-    case AMQP_CONNECTION_CLOSE_METHOD:
-      die("Argh connection close!");
+    case AMQP_CONNECTION_CLOSE_METHOD: {
+      amqp_connection_close_t *m = (amqp_connection_close_t *) frame->payload.method.decoded;
+      SEND_METHOD(conn, 0, AMQP_CONNECTION_CLOSE_OK_METHOD, amqp_connection_close_ok_t);
+      /* TODO: wait for the close_ok to be transmitted before closing the socket! */
+      conn->state = CONNECTION_STATE_DEAD;
+      close_connection(conn,
+		       m->reply_code,
+		       "Connection close received from peer with code %s (%d): %*s",
+		       amqp_constant_name(m->reply_code),
+		       m->reply_code,
+		       m->reply_text.len,
+		       m->reply_text.bytes);
       break;
+    }
 
     case AMQP_CONNECTION_CLOSE_OK_METHOD:
       conn->state = CONNECTION_STATE_DEAD;
@@ -302,8 +322,9 @@ static void handle_protocol_header(connstate_t *conn, amqp_frame_t *frame) {
   conn->state = CONNECTION_STATE_HEADER_RECEIVED;
 
   {
-    amqp_table_entry_t entries[2] = { AMQP_TABLE_ENTRY_S("product", amqp_cstring_bytes("rais")),
-				      AMQP_TABLE_ENTRY_S("version", amqp_cstring_bytes(VERSION)) };
+    amqp_table_entry_t entries[2] = { AMQP_TABLE_ENTRY_UTF8("product", amqp_cstring_bytes("rais")),
+				      AMQP_TABLE_ENTRY_UTF8("version",
+							    amqp_cstring_bytes(VERSION)) };
     amqp_table_t server_info = { .num_entries = sizeof(entries) / sizeof(entries[0]),
 				 .entries = &entries[0] };
 
