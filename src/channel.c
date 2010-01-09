@@ -96,6 +96,11 @@ void handle_channel_normal(connstate_t *conn,
       resource_name_t name;
       exchange_t *x;
 
+      if (m->mandatory || m->immediate) {
+	chan->status = AMQP_NOT_IMPLEMENTED;
+	break;
+      }
+
       name.vhost = conn->vhost;
       name.name = m->exchange;
       x = lookup_exchange(&chan->status, &name);

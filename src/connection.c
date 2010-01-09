@@ -103,9 +103,9 @@ void close_connection(connstate_t *conn, short code, char const *explanation, ..
   }
 }
 
-static void set_channel_callback(connstate_t *conn,
-				 amqp_channel_t ch,
-				 channel_callback_t cb)
+void set_channel_callback(connstate_t *conn,
+			  amqp_channel_t ch,
+			  channel_callback_t cb)
 {
   assert(ch <= MAX_CHANNELS);
   conn->channel_callback[ch] = cb;
@@ -296,7 +296,6 @@ static void handle_start_ok(connstate_t *conn, amqp_frame_t *frame, chanstate_t 
   set_channel_callback(conn, 0, &handle_tune_ok);
   SEND_METHOD(conn, 0, AMQP_CONNECTION_TUNE_METHOD, amqp_connection_tune_t,
 	      MAX_CHANNELS, SUGGESTED_FRAME_MAX, 0);
-
 }
 
 static void handle_protocol_header(connstate_t *conn, amqp_frame_t *frame) {

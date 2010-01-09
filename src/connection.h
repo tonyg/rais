@@ -44,6 +44,10 @@ extern void close_connection_command_invalid(connstate_t *conn, amqp_frame_t *fr
   } else {							\
   }
 
+extern void set_channel_callback(connstate_t *conn,
+				 amqp_channel_t ch,
+				 channel_callback_t cb);
+
 extern void close_channel(connstate_t *conn,
 			  amqp_channel_t ch,
 			  short code,
