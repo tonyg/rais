@@ -46,7 +46,7 @@ static void run_syncpipe(syncpipe_t *p) {
     }
 
     if (w->remaining == 0) {
-      if (w->callback) {
+      if (w->callback != NULL) {
 	w->callback(w->context, w->data);
       }
       p->first_out = w->next;
@@ -56,13 +56,22 @@ static void run_syncpipe(syncpipe_t *p) {
   }
 }
 
-void syncpipe_write(syncpipe_out_t po,
-		    amqp_bytes_t data,
-		    void *context,
-		    syncpipe_callback_t callback)
+amqp_boolean_t syncpipe_write(syncpipe_out_t po,
+			      amqp_bytes_t data,
+			      void *context,
+			      syncpipe_callback_t callback)
 {
   syncpipe_t *p = po.p;
-  syncpipe_out_chunk_t *w = malloc(sizeof(syncpipe_out_chunk_t));
+  syncpipe_out_chunk_t *w;
+
+  if (p->is_closed) {
+    if (callback != NULL) {
+      callback(context, data);
+    }
+    return 0;
+  }
+
+  w = malloc(sizeof(syncpipe_out_chunk_t));
   w->next = NULL;
   w->data = data;
   w->remaining = data.len;
@@ -75,15 +84,23 @@ void syncpipe_write(syncpipe_out_t po,
   }
   p->last_out = w;
   run_syncpipe(p);
+  return 1;
 }
 
-void syncpipe_read(syncpipe_in_t pi,
-		   size_t length,
-		   void *context,
-		   syncpipe_callback_t callback)
+amqp_boolean_t syncpipe_read(syncpipe_in_t pi,
+			     size_t length,
+			     void *context,
+			     syncpipe_callback_t callback)
 {
   syncpipe_t *p = pi.p;
-  syncpipe_reader_t *r = malloc(sizeof(syncpipe_reader_t));
+  syncpipe_reader_t *r;
+
+  if (p->is_closed) {
+    callback(context, AMQP_EMPTY_BYTES);
+    return 0;
+  }
+
+  r = malloc(sizeof(syncpipe_reader_t));
   r->next = NULL;
   r->remaining = length;
   r->context = context;
@@ -95,6 +112,7 @@ void syncpipe_read(syncpipe_in_t pi,
   }
   p->last_in = r;
   run_syncpipe(p);
+  return 1;
 }
 
 static void syncpipe_close(syncpipe_t *p) {
@@ -108,7 +126,7 @@ static void syncpipe_close(syncpipe_t *p) {
     syncpipe_out_chunk_t *w = p->first_out;
     while (w != NULL) {
       syncpipe_out_chunk_t *next = w->next;
-      if (w->callback) {
+      if (w->callback != NULL) {
 	w->callback(w->context, w->data);
       }
       free(w);

@@ -38,14 +38,14 @@ typedef struct syncpipe_out_t_ {
 #define NULL_SYNCPIPE_IN ((syncpipe_in_t) { .p = NULL })
 
 extern void open_syncpipe(syncpipe_out_t *po, syncpipe_in_t *pi);
-extern void syncpipe_write(syncpipe_out_t po,
-			   amqp_bytes_t data,
-			   void *context,
-			   syncpipe_callback_t callback);
-extern void syncpipe_read(syncpipe_in_t pi,
-			  size_t length,
-			  void *context,
-			  syncpipe_callback_t callback);
+extern amqp_boolean_t syncpipe_write(syncpipe_out_t po,
+				     amqp_bytes_t data,
+				     void *context,
+				     syncpipe_callback_t callback);
+extern amqp_boolean_t syncpipe_read(syncpipe_in_t pi,
+				    size_t length,
+				    void *context,
+				    syncpipe_callback_t callback);
 extern void syncpipe_close_out(syncpipe_out_t po);
 extern void syncpipe_close_in(syncpipe_in_t pi);
 
