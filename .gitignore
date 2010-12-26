@@ -20,6 +20,8 @@ missing
 scratch/
 stamp-h1
 
-
 *.o
 rais
+
+experiments/pth_and_ucontext/pthtest
+experiments/pth_and_ucontext/uc
