@@ -1,3 +1,4 @@
+/* Copyright (C) 2010 Tony Garnock-Jones. All rights reserved. */
 /* Not very fast, as it happens. < 20kHz. */
 /* Compare with ucontext_t (uc.c), > 150 kHz on osx, > 500 kHz on linux in a VM on osx. */
 

@@ -1,3 +1,5 @@
+/* Copyright (C) 2010 Tony Garnock-Jones. All rights reserved. */
+
 #define _XOPEN_SOURCE 600
 
 #include <stdlib.h>
